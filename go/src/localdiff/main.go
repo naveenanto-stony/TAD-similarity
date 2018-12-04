@@ -20,6 +20,7 @@ type bdyvi struct {
 	start int
 	end   int
 	vi    float64
+	vi_without_boundary float64
 	jacc  float64
 	hamming float64
 	overlap float64
@@ -166,8 +167,8 @@ func calcNaiveMetrics(tadlists [][][]int) ([]bdyvi) {
 				}
 				//fmt.Println(newbdyvi.jacc,newbdyvi.hamming)
 
-				newbdyvi.vi = calcViNaive(tadlists, tadstart[0], tadend[1])
-
+				newbdyvi.vi = calcViNaive(tadlists, tadstart[0], tadend[1],false)
+				newbdyvi.vi_without_boundary = calcViNaive(tadlists, tadstart[0], tadend[1],true)
 				bdyvilist = append(bdyvilist, newbdyvi)
 			}
 		}
@@ -184,12 +185,21 @@ func calcNaiveMetrics(tadlists [][][]int) ([]bdyvi) {
 
 }
 
-func calcViNaive(tadlists [][][]int, tadstart int, tadend int) (float64){
+func calcViNaive(tadlists [][][]int, tadstart int, tadend int, exclude_boundary bool) (float64){
 	var newbdyvi bdyvi
+	var intvl1 [][]int
+	var intvl2 [][]int
+	var overlaps [][]int
 
-	intvl1 := hicutil.ProcessIntervals(tadlists[0], tadstart, tadend)
-	intvl2 := hicutil.ProcessIntervals(tadlists[1], tadstart, tadend)
-	overlaps := hicutil.CalcOverlaps(intvl1, intvl2)
+	if !exclude_boundary {
+		intvl1 = hicutil.ProcessIntervals(tadlists[0], tadstart, tadend)
+		intvl2 = hicutil.ProcessIntervals(tadlists[1], tadstart, tadend)
+		overlaps = hicutil.CalcOverlaps(intvl1, intvl2)
+	} else {
+		intvl1 = hicutil.ProcessIntervalsWithoutBoundary(tadlists[0], tadstart, tadend)
+		intvl2 = hicutil.ProcessIntervalsWithoutBoundary(tadlists[1], tadstart, tadend)
+		overlaps = hicutil.CalcOverlaps(intvl1, intvl2)
+	}
 
 	n := tadend - tadstart + 1
 
@@ -596,21 +606,23 @@ func writeOutputToFile(domsigpts []bdyvi, outfile *string) {
 	//defer f.Close()
 
 	w := bufio.NewWriter(f)
-	labelline := []string{"start", "end", "VI", "Jaccord","Overlap", "Dice", "p-value"}
+	labelline := []string{"start", "end", "VI", "Jaccord","Overlap",
+	"Dice","VI_boundaryless", "p-value"}
 	//fmt.Println(strings.Join(labelline, "\t"))
 	line1 := strings.Join(labelline, ",")
 	//fmt.Println(line1)
 	fmt.Fprintf(w, line1+"\n")
 
 	for _, vals := range domsigpts {
-		strvals := make([]string, 7)
+		strvals := make([]string, 8)
 		strvals[0] = strconv.Itoa(vals.start)
 		strvals[1] = strconv.Itoa(vals.end)
 		strvals[2] = strconv.FormatFloat(vals.vi, 'g', -1, 64)
 		strvals[3] = strconv.FormatFloat(vals.jacc, 'g', -1, 64)
 		strvals[4] = strconv.FormatFloat(vals.overlap, 'g', -1, 64)
 		strvals[5] = strconv.FormatFloat(vals.dice, 'g', -1, 64)
-		strvals[6] = strconv.FormatFloat(vals.pval, 'g', -1, 64)
+		strvals[6] = strconv.FormatFloat(vals.vi_without_boundary, 'g', -1, 64)
+		strvals[7] = strconv.FormatFloat(vals.pval, 'g', -1, 64)
 		newline := strings.Join(strvals, ",")
 		fmt.Fprintf(w, newline+"\n")
 	}
