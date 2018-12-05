@@ -1,5 +1,12 @@
 package hicutil
 
+/**
+This function returns intervals without considering the start and end.
+i.e, it returns (start,end) rather than the [start,end]
+
+The function is used in calculating VI excluding the boundary points as
+the boundary points were considered from jaccard index
+*/
 func ProcessIntervalsWithoutBoundary(tadlist [][]int, start int, end int) [][]int {
 	// cut tadlist to just the [start, end] interval, and subtract start
 
