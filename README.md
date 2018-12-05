@@ -17,7 +17,7 @@ Usage of ./localdiff:
   * -res int
        resolution of Hi-C data (default 1)
   * -tad string
-       comma-separated list of two TAD filenames or file patterns if optimizing gamma"""
+       comma-separated list of two TAD filenames
 
 
 We will go through an example, using the files provided in the go/example folder. These example TAD sets are random sample created to compare the different metrics. In order to compare these two TAD sets with different metrics, run the following command:
