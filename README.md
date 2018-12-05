@@ -37,4 +37,36 @@ The output file is a csv which contains the following columns for each start and
   * VI_boundaryless : VI similarity score excluding the boundary points
 
 
-### ANALYSIS
+### ANALYSIS:
+
+A python script can be found in the scripts folder to plot the different metrics.
+<br>
+<pre>usage: analysis.py [-h] -i -metrics
+
+optional arguments:
+  -h, --help        show this help message and exit
+  -i                input file path (out.csv from go)
+  -metrics          Comma separated metrics(Column names) to compare |
+                    Accepted column names: 
+                    'Jaccord','jacc_0.95_0.05',
+                    'jacc_0.9_0.1', 'jacc_0.85_0.15','jacc_0.15_0.85',
+                    'jacc_0.5_0.5','Overlap','Dice'
+</pre>
+
+The column name 'jacc_0.9_0.1' corresponds to 90% weightage to jaccard index (boundary) and 10% weightage to VI metric (interval)
+
+The output of the analysis consist of a graph plotting the list of metrics provided. It also outputs the correlation with VI for each metric.
+
+#### Sample Analysis:
+
+Code: `python3 analysis.py -i ../out.csv -metrics=VI,jacc_0.15_0.85,Jaccord`
+
+Command line output:
+<pre>
+Correlation with VI
+VI                1.000000
+jacc_0.15_0.85    0.606020
+Jaccord           0.537286
+</pre>
+Image output: <br>
+![Similarity Plot](https://user-images.githubusercontent.com/45582545/49527838-b91d2f00-f880-11e8-93db-66702f8d2bab.png)
