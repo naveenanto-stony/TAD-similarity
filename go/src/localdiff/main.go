@@ -17,16 +17,16 @@ import (
 )
 
 type bdyvi struct {
-	start int
-	end   int
-	vi    float64
+	start               int
+	end                 int
+	vi                  float64
 	vi_without_boundary float64
-	jacc  float64
-	hamming float64
-	overlap float64
-	dice  float64
-	pval  float64
-
+	jacc                float64
+	hamming             float64
+	overlap             float64
+	centroidDistance    float64
+	dice                float64
+	pval                float64
 }
 
 func main() {
@@ -104,7 +104,7 @@ func main() {
 	fmt.Println("total time:", totaltime)*/
 }
 
-func processTADLists(tadfilelist []string, res *int, gammaopt bool, medtadlen float64) ([][][]int) {
+func processTADLists(tadfilelist []string, res *int, gammaopt bool, medtadlen float64) [][][]int {
 
 	tadlists := make([][][]int, 2)
 	chrlength := 0
@@ -135,7 +135,7 @@ type condentropy struct {
 	condh2 float64
 }
 
-func calcNaiveMetrics(tadlists [][][]int) ([]bdyvi) {
+func calcNaiveMetrics(tadlists [][][]int) []bdyvi {
 	var bdyvilist []bdyvi
 	var newbdyvi bdyvi
 
@@ -154,21 +154,20 @@ func calcNaiveMetrics(tadlists [][][]int) ([]bdyvi) {
 				//n1 := extendn(tadlists[0],tadend[1])
 				//n2 := extendn(tadlists[1],tadend[1])
 
-
 				var setACount, setBCount, unionCount, intersectionCount float64 = calcCardinality(tadlists, tadstart[0], tadend[1])
 
-				newbdyvi.jacc = calcJaccordSimilarity(unionCount,intersectionCount)
-				newbdyvi.hamming = calcHammingDistance(setACount,setBCount,unionCount,intersectionCount)
-				newbdyvi.dice = calcTversky(setACount,setBCount,unionCount,intersectionCount)
+				newbdyvi.jacc = calcJaccordSimilarity(unionCount, intersectionCount)
+				newbdyvi.hamming = calcHammingDistance(setACount, setBCount, unionCount, intersectionCount)
+				newbdyvi.dice = calcTversky(setACount, setBCount, unionCount, intersectionCount)
 				newbdyvi.overlap = calcOverlap(setACount, setBCount, intersectionCount)
 
 				if newbdyvi.hamming > max_hamming {
 					max_hamming = newbdyvi.hamming
 				}
 				//fmt.Println(newbdyvi.jacc,newbdyvi.hamming)
-
-				newbdyvi.vi = calcViNaive(tadlists, tadstart[0], tadend[1],false)
-				newbdyvi.vi_without_boundary = calcViNaive(tadlists, tadstart[0], tadend[1],true)
+				newbdyvi.centroidDistance = calcCentroidDistance(tadlists, tadstart[0], tadend[1])
+				newbdyvi.vi = calcViNaive(tadlists, tadstart[0], tadend[1], false)
+				newbdyvi.vi_without_boundary = calcViNaive(tadlists, tadstart[0], tadend[1], true)
 				bdyvilist = append(bdyvilist, newbdyvi)
 			}
 		}
@@ -185,7 +184,48 @@ func calcNaiveMetrics(tadlists [][][]int) ([]bdyvi) {
 
 }
 
-func calcViNaive(tadlists [][][]int, tadstart int, tadend int, exclude_boundary bool) (float64){
+/**
+Finds the median of the intervals in both tad lists and then
+tries to assign the nearest centroids of interval1 (interval from
+tadset1) to interval2 (interval from tadset1).
+
+The dissimilarity is measure of how much distance does the centroid
+of tadset2 has to move in order to align with tadset1
+*/
+func calcCentroidDistance(tadlists [][][]int, tadstart int, tadend int) float64 {
+	intvl1 := hicutil.ProcessIntervals(tadlists[0], tadstart, tadend)
+	intvl2 := hicutil.ProcessIntervals(tadlists[1], tadstart, tadend)
+
+	// Calculate median of interval1 (tadset1)
+	var medians []float64
+	for i := range intvl1 {
+		median := float64(intvl1[i][1]-intvl1[i][0]) / 2.0
+		medians = append(medians, median)
+	}
+	// Find the nearest centroid for each interval in tadset2
+	totalError := 0.0
+	for i := range intvl2 {
+		median := float64(intvl2[i][1]-intvl2[i][0]) / 2.0
+		minDistance := math.MaxFloat64
+		for j := range medians {
+			// Distance to move centroid of tadset2 to align with tadset1
+			distance := (medians[j] - median) * (medians[j] - median)
+			if distance < minDistance {
+				minDistance = distance
+			}
+		}
+		totalError += minDistance
+	}
+
+	// Calculate Root mean squared error
+	rootMeanSquaredError := math.Sqrt(totalError / float64(len(intvl2)))
+	// Normalize to get value between 0 to 1
+	normalizedMeanSquaredError := rootMeanSquaredError / float64(tadend-tadstart)
+
+	return normalizedMeanSquaredError
+}
+
+func calcViNaive(tadlists [][][]int, tadstart int, tadend int, exclude_boundary bool) float64 {
 	var newbdyvi bdyvi
 	var intvl1 [][]int
 	var intvl2 [][]int
@@ -227,9 +267,9 @@ func calcCardinality(tadLists [][][]int, start int, end int) (float64, float64, 
 	boundarySet := make(map[int]bool)
 	boundaryIntersectionSet := make(map[int]bool)
 
-	var setACount,setBCount float64 = 0,0
+	var setACount, setBCount float64 = 0, 0
 
-	for _,tad := range tadList1 {
+	for _, tad := range tadList1 {
 		if tad[0] >= start && tad[0] <= end && !boundarySet[tad[0]] {
 			boundarySet[tad[0]] = true
 			setACount += 1
@@ -241,11 +281,11 @@ func calcCardinality(tadLists [][][]int, start int, end int) (float64, float64, 
 
 	}
 
-	for _,tad := range tadList2 {
+	for _, tad := range tadList2 {
 		if boundarySet[tad[0]] == true {
 			boundaryIntersectionSet[tad[0]] = true
 			setBCount += 1
-		} else if tad[0] >= start && tad[0] <= end && !boundarySet[tad[0]]{
+		} else if tad[0] >= start && tad[0] <= end && !boundarySet[tad[0]] {
 			boundarySet[tad[0]] = true
 			setBCount += 1
 		}
@@ -259,34 +299,34 @@ func calcCardinality(tadLists [][][]int, start int, end int) (float64, float64, 
 		}
 	}
 
-	var unionCount float64  = float64(len(boundarySet))
+	var unionCount float64 = float64(len(boundarySet))
 	var intersectionCount float64 = float64(len(boundaryIntersectionSet))
 	//fmt.Println(setACount,setBCount,unionCount,intersectionCount)
-	return setACount,setBCount,unionCount,intersectionCount
+	return setACount, setBCount, unionCount, intersectionCount
 }
-func calcJaccordSimilarity(unionCount float64, intersectionCount float64) (float64) {
+func calcJaccordSimilarity(unionCount float64, intersectionCount float64) float64 {
 	//var hammingDistance float64 = math.Abs((setACount - intersectionCount) + (setBCount-intersectionCount)) / unionCount
 	//fmt.Println(hammingDistance,1.0 - float64(len(boundaryIntersectionSet)) / float64(len(boundarySet)) )
-	return  1.0 - (intersectionCount / unionCount)
+	return 1.0 - (intersectionCount / unionCount)
 }
 
-func calcOverlap(setACount float64,setBCount float64,intersectionCount float64) float64 {
-	return 1.0 - intersectionCount/math.Min(setACount,setBCount)
+func calcOverlap(setACount float64, setBCount float64, intersectionCount float64) float64 {
+	return 1.0 - intersectionCount/math.Min(setACount, setBCount)
 }
 
-func calcHammingDistance(setACount float64,setBCount float64, unionCount float64, intersectionCount float64) (float64) {
+func calcHammingDistance(setACount float64, setBCount float64, unionCount float64, intersectionCount float64) float64 {
 	//fmt.Println(setACount,setBCount,unionCount,intersectionCount)
-	var hammingDistance float64 = math.Abs((setACount - intersectionCount) + (setBCount-intersectionCount)) / unionCount
+	var hammingDistance float64 = math.Abs((setACount-intersectionCount)+(setBCount-intersectionCount)) / unionCount
 	//fmt.Println(hammingDistance,1.0 - float64(len(boundaryIntersectionSet)) / float64(len(boundarySet)) )
 	//fmt.Println(hammingDistance)
-	return  hammingDistance
+	return hammingDistance
 }
 
-func calcTversky(setACount float64,setBCount float64, unionCount float64, intersectionCount float64) (float64) {
+func calcTversky(setACount float64, setBCount float64, unionCount float64, intersectionCount float64) float64 {
 	var setADiffSetB float64 = setACount - intersectionCount
 	var setBDiffsetA float64 = setBCount - intersectionCount
 	var alpha float64 = 0.5
-	var beta float64  = 0.5
+	var beta float64 = 0.5
 	/*var a,b float64 = 0,0
 	if setADiffSetB > setBDiffsetA {
 		b = setADiffSetB
@@ -310,7 +350,7 @@ func calcTversky(setACount float64,setBCount float64, unionCount float64, inters
 	return overlaps
 }*/
 
-func calcVIatBdys(tadlists [][][]int) ([]bdyvi) {
+func calcVIatBdys(tadlists [][][]int) []bdyvi {
 
 	var bdyvilist []bdyvi
 	dpmap := make(map[int]map[int]condentropy) // keys should be [start][end]
@@ -490,25 +530,25 @@ func calcAllPvals(tadlists [][][]int, bdyvis []bdyvi, numCPU int, convcond float
 
 /*func calcAllPvals(tadlists [][][]int, bdyvis []bdyvi, convcond float64) []bdyvi {
 
-	var sigpts []bdyvi
-	bdyvis_pval := make([]bdyvi, len(bdyvis))
-	allpvals := make([]float64,len(bdyvis_pval))
-	for i,querypt := range bdyvis {
-		bdyvis_pval[i] = appendPval(tadlists, querypt, convcond)
-		allpvals[i] = bdyvis_pval[i].pval
+var sigpts []bdyvi
+bdyvis_pval := make([]bdyvi, len(bdyvis))
+allpvals := make([]float64,len(bdyvis_pval))
+for i,querypt := range bdyvis {
+	bdyvis_pval[i] = appendPval(tadlists, querypt, convcond)
+	allpvals[i] = bdyvis_pval[i].pval
+}
+/*for _,query := range bdyvis_pval {
+	if query.pval < 0.05 {
+		sigpts = append(sigpts, query)
 	}
-	/*for _,query := range bdyvis_pval {
-		if query.pval < 0.05 {
-			sigpts = append(sigpts, query)
-		}
-	}*/
+}*/
 /*bhidx := hicutil.MultHypTestBH(allpvals)
 sort.Slice(bdyvis_pval, func(i,j int) bool {return bdyvis_pval[i].pval < bdyvis_pval[j].pval})
 sigpts = bdyvis_pval[:bhidx+1]
 return sigpts
 }*/
 
-func appendPval(tadlists [][][]int, querypt bdyvi, convcond float64, r *rand.Rand) (bdyvi) {
+func appendPval(tadlists [][][]int, querypt bdyvi, convcond float64, r *rand.Rand) bdyvi {
 
 	intvl1 := hicutil.ProcessIntervals(tadlists[0], querypt.start, querypt.end)
 	intvl2 := hicutil.ProcessIntervals(tadlists[1], querypt.start, querypt.end)
@@ -606,23 +646,24 @@ func writeOutputToFile(domsigpts []bdyvi, outfile *string) {
 	//defer f.Close()
 
 	w := bufio.NewWriter(f)
-	labelline := []string{"start", "end", "VI", "Jaccord","Overlap",
-	"Dice","VI_boundaryless", "p-value"}
+	labelline := []string{"start", "end", "VI", "Jaccord", "Overlap",
+		"Dice", "CentroidDistance", "VI_boundaryless", "p-value"}
 	//fmt.Println(strings.Join(labelline, "\t"))
 	line1 := strings.Join(labelline, ",")
 	//fmt.Println(line1)
 	fmt.Fprintf(w, line1+"\n")
 
 	for _, vals := range domsigpts {
-		strvals := make([]string, 8)
+		strvals := make([]string, 9)
 		strvals[0] = strconv.Itoa(vals.start)
 		strvals[1] = strconv.Itoa(vals.end)
 		strvals[2] = strconv.FormatFloat(vals.vi, 'g', -1, 64)
 		strvals[3] = strconv.FormatFloat(vals.jacc, 'g', -1, 64)
 		strvals[4] = strconv.FormatFloat(vals.overlap, 'g', -1, 64)
 		strvals[5] = strconv.FormatFloat(vals.dice, 'g', -1, 64)
-		strvals[6] = strconv.FormatFloat(vals.vi_without_boundary, 'g', -1, 64)
-		strvals[7] = strconv.FormatFloat(vals.pval, 'g', -1, 64)
+		strvals[6] = strconv.FormatFloat(vals.centroidDistance, 'g', -1, 64)
+		strvals[7] = strconv.FormatFloat(vals.vi_without_boundary, 'g', -1, 64)
+		strvals[8] = strconv.FormatFloat(vals.pval, 'g', -1, 64)
 		newline := strings.Join(strvals, ",")
 		fmt.Fprintf(w, newline+"\n")
 	}
