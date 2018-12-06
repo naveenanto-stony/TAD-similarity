@@ -20,7 +20,7 @@ plt.rcParams['figure.figsize'] = [12, 7]
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('-i', help='input file in csv format', required=True)
+parser.add_argument('-i', help='input file path (out.csv from go)', required=True)
 parser.add_argument('-metrics', help="Comma separated metrics(Column names) to compare  |"
                                      " Accepted column names: 'Jaccord','jacc_0.95_0.05', 'jacc_0.9_0.1', 'jacc_0.85_0.15',"
                                      "'jacc_0.15_0.85', 'jacc_0.5_0.5','Overlap','Dice'", required=True)
