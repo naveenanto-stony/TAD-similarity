@@ -17,17 +17,20 @@ import (
 )
 
 type bdyvi struct {
-	start               int
-	end                 int
-	vi                  float64
-	vi_without_boundary float64
-	jacc                float64
-	hamming             float64
-	overlap             float64
-	centroidDistance    float64
-	dice                float64
-	pval                float64
+	start                  int
+	end                    int
+	vi                     float64
+	vi_without_boundary    float64
+	jacc                   float64
+	hamming                float64
+	overlap                float64
+	centroidSquareDistance float64
+	centroidAbsDistance    float64
+	dice                   float64
+	pval                   float64
 }
+
+type fn func(a float64, b float64) float64
 
 func main() {
 
@@ -165,7 +168,8 @@ func calcNaiveMetrics(tadlists [][][]int) []bdyvi {
 					max_hamming = newbdyvi.hamming
 				}
 				//fmt.Println(newbdyvi.jacc,newbdyvi.hamming)
-				newbdyvi.centroidDistance = calcCentroidDistance(tadlists, tadstart[0], tadend[1])
+				newbdyvi.centroidSquareDistance = calcCentroidDistance(tadlists, tadstart[0], tadend[1], squareDistance)
+				newbdyvi.centroidAbsDistance = calcCentroidDistance(tadlists, tadstart[0], tadend[1], absDistance)
 				newbdyvi.vi = calcViNaive(tadlists, tadstart[0], tadend[1], false)
 				newbdyvi.vi_without_boundary = calcViNaive(tadlists, tadstart[0], tadend[1], true)
 				bdyvilist = append(bdyvilist, newbdyvi)
@@ -184,6 +188,14 @@ func calcNaiveMetrics(tadlists [][][]int) []bdyvi {
 
 }
 
+func squareDistance(a float64, b float64) float64 {
+	return float64((a - b) * (a - b))
+}
+
+func absDistance(a float64, b float64) float64 {
+	return math.Abs(float64(a - b))
+}
+
 /**
 Finds the median of the intervals in both tad lists and then
 tries to assign the nearest centroids of interval1 (interval from
@@ -192,7 +204,7 @@ tadset1) to interval2 (interval from tadset1).
 The dissimilarity is measure of how much distance does the centroid
 of tadset2 has to move in order to align with tadset1
 */
-func calcCentroidDistance(tadlists [][][]int, tadstart int, tadend int) float64 {
+func calcCentroidDistance(tadlists [][][]int, tadstart int, tadend int, distance fn) float64 {
 	intvl1 := hicutil.ProcessIntervals(tadlists[0], tadstart, tadend)
 	intvl2 := hicutil.ProcessIntervals(tadlists[1], tadstart, tadend)
 
@@ -209,7 +221,7 @@ func calcCentroidDistance(tadlists [][][]int, tadstart int, tadend int) float64 
 		minDistance := math.MaxFloat64
 		for j := range medians {
 			// Distance to move centroid of tadset2 to align with tadset1
-			distance := (medians[j] - median) * (medians[j] - median)
+			distance := distance(medians[j], median)
 			if distance < minDistance {
 				minDistance = distance
 			}
@@ -647,23 +659,24 @@ func writeOutputToFile(domsigpts []bdyvi, outfile *string) {
 
 	w := bufio.NewWriter(f)
 	labelline := []string{"start", "end", "VI", "Jaccord", "Overlap",
-		"Dice", "CentroidDistance", "VI_boundaryless", "p-value"}
+		"Dice", "CentroidSquareDistance", "CentroidAbsoluteDistance", "VI_boundaryless", "p-value"}
 	//fmt.Println(strings.Join(labelline, "\t"))
 	line1 := strings.Join(labelline, ",")
 	//fmt.Println(line1)
 	fmt.Fprintf(w, line1+"\n")
 
 	for _, vals := range domsigpts {
-		strvals := make([]string, 9)
+		strvals := make([]string, 10)
 		strvals[0] = strconv.Itoa(vals.start)
 		strvals[1] = strconv.Itoa(vals.end)
 		strvals[2] = strconv.FormatFloat(vals.vi, 'g', -1, 64)
 		strvals[3] = strconv.FormatFloat(vals.jacc, 'g', -1, 64)
 		strvals[4] = strconv.FormatFloat(vals.overlap, 'g', -1, 64)
 		strvals[5] = strconv.FormatFloat(vals.dice, 'g', -1, 64)
-		strvals[6] = strconv.FormatFloat(vals.centroidDistance, 'g', -1, 64)
-		strvals[7] = strconv.FormatFloat(vals.vi_without_boundary, 'g', -1, 64)
-		strvals[8] = strconv.FormatFloat(vals.pval, 'g', -1, 64)
+		strvals[6] = strconv.FormatFloat(vals.centroidSquareDistance, 'g', -1, 64)
+		strvals[7] = strconv.FormatFloat(vals.centroidAbsDistance, 'g', -1, 64)
+		strvals[8] = strconv.FormatFloat(vals.vi_without_boundary, 'g', -1, 64)
+		strvals[9] = strconv.FormatFloat(vals.pval, 'g', -1, 64)
 		newline := strings.Join(strvals, ",")
 		fmt.Fprintf(w, newline+"\n")
 	}
