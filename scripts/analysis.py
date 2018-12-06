@@ -48,7 +48,7 @@ df.fillna(0, inplace=True)
 
 for i in range(len(boundary_score)):
     df['jacc_' + str(boundary_score[i]) + '_' + str(interval_score[i])] = boundary_score[i] * df['Jaccord'] + \
-                                                                          interval_score[i] * df['VI_boundaryless']
+                                                                          interval_score[i] * df['VI']
 
 print("Correlation with VI")
 print(df[metrics].corrwith(df['VI']))

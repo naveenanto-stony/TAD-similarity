@@ -271,7 +271,7 @@ func calcJaccordSimilarity(unionCount float64, intersectionCount float64) (float
 }
 
 func calcOverlap(setACount float64,setBCount float64,intersectionCount float64) float64 {
-	return 1.0 - intersectionCount/math.Min(setACount,setBCount)
+	return intersectionCount/math.Min(setACount,setBCount)
 }
 
 func calcHammingDistance(setACount float64,setBCount float64, unionCount float64, intersectionCount float64) (float64) {
