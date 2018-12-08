@@ -50,7 +50,8 @@ optional arguments:
                     Accepted column names: 
                     'Jaccord','jacc_0.95_0.05',
                     'jacc_0.9_0.1', 'jacc_0.85_0.15','jacc_0.15_0.85',
-                    'jacc_0.5_0.5','Overlap','Dice','CentroidDistance'
+                    'jacc_0.5_0.5','Overlap','Dice','CentroidSquareDistance',
+                    'CentroidAbsoluteDistance'
 </pre>
 
 The column name 'jacc_0.9_0.1' corresponds to 90% weightage to jaccard index (boundary) and 10% weightage to VI metric (interval)
